@@ -1,4 +1,5 @@
 #include <algorithm>
+#include <array>
 #include <cassert>
 #include <cmath>
 #include <stdexcept>
@@ -127,10 +128,45 @@ void test_step_4() {
     assert(close(z.tangent(), -1.0 + std::cos(2.0)));
 }
 
+
+Dual step_5_function(Dual x, Dual y) {
+    return x * y + sin(x);
+}
+
+double step_5_function(double x, double y) {
+    return x * y + std::sin(x);
+}
+
+void test_step_5() {
+    Dual x1{2.0, 1.0};
+    Dual y1{3.0, 0.0};
+    double dzdx = step_5_function(x1, y1).tangent();
+
+    Dual x2{2.0, 0.0};
+    Dual y2{3.0, 1.0};
+    double dzdy = step_5_function(x2, y2).tangent();
+
+    std::array<double, 2> gradient{dzdx, dzdy};
+
+    constexpr double h = 1e-6;
+    double numerical_dfdx =
+        (step_5_function(2.0 + h, 3.0) - step_5_function(2.0 - h, 3.0)) /
+        (2.0 * h);
+    double numerical_dfdy =
+        (step_5_function(2.0, 3.0 + h) - step_5_function(2.0, 3.0 - h)) /
+        (2.0 * h);
+
+    assert(close(gradient[0], 3.0 + std::cos(2.0)));
+    assert(close(gradient[1], 2.0));
+    assert(close(gradient[0], numerical_dfdx, 1e-6));
+    assert(close(gradient[1], numerical_dfdy, 1e-6));
+}
+
 int main() {
     test_step_0();
     test_step_1();
     test_step_2();
     test_step_3();
     test_step_4();
+    test_step_5();
 }
