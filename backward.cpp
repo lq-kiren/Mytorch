@@ -1,6 +1,7 @@
 #include <cassert>
 #include <cstddef>
 #include <memory>
+#include <unordered_set>
 #include <utility>
 #include <vector>
 
@@ -40,6 +41,8 @@ public:
 
     bool same_node_as(const Value& other) const { return node_ == other.node_; }
 
+    void backward();
+
 private:
     // 运算符用这个构造函数把新 Value 包装在已创建的结果节点外面。
     explicit Value(std::shared_ptr<Node> node) : node_(std::move(node)) {}
@@ -47,10 +50,48 @@ private:
     // 结果节点只持有父节点，父节点不持有结果节点，所以不会形成引用环。
     std::shared_ptr<Node> node_;
 
+    static void build_topology(
+        const std::shared_ptr<Node>& node,
+        std::unordered_set<const Node*>& visited,
+        std::vector<std::shared_ptr<Node>>& topology);
+
     // 运算符需要访问 node_，才能把 lhs、rhs 记录为新节点的父节点。
     friend Value operator+(const Value& lhs, const Value& rhs);
     friend Value operator*(const Value& lhs, const Value& rhs);
 };
+
+void Value::build_topology(
+    const std::shared_ptr<Node>& node,
+    std::unordered_set<const Node*>& visited,
+    std::vector<std::shared_ptr<Node>>& topology) {
+    // 共享子图可能从多条路径到达，同一节点只加入拓扑序一次。
+    if (!visited.insert(node.get()).second) {
+        return;
+    }
+
+    // 后序遍历：先放父节点，再放使用它们计算出的当前节点。
+    for (const Edge& edge : node->parents) {
+        build_topology(edge.parent, visited, topology);
+    }
+    topology.push_back(node);
+}
+
+void Value::backward() {
+    std::unordered_set<const Node*> visited;
+    std::vector<std::shared_ptr<Node>> topology;
+    build_topology(node_, visited, topology);
+
+    // 标量输出对自身的导数是 1，它是反向传播的起点。
+    node_->grad = 1.0;
+
+    // topology 是“叶子到输出”，所以反向迭代才能从输出走向叶子。
+    for (auto current = topology.rbegin(); current != topology.rend(); ++current) {
+        for (const Edge& edge : (*current)->parents) {
+            // 使用 +=，因为同一父节点可能通过多条路径影响输出。
+            edge.parent->grad += (*current)->grad * edge.local_derivative;
+        }
+    }
+}
 
 Value operator+(const Value& lhs, const Value& rhs) {
     auto node =
@@ -69,12 +110,8 @@ Value operator*(const Value& lhs, const Value& rhs) {
 }
 
 void test_step_6() {
-    // 计算图如下，其中两个 x 指向同一个节点：
-    //          z (+)
-    //         /     \
-    // product (*)   x
-    //      /   \
-    //     x     y
+    // 计算图：z(+) 的父节点为 [product, x]，
+    // product(*) 的父节点为 [x, y]；两处 x 指向同一个节点。
     Value x{2.0};
     Value y{3.0};
     Value product = x * y;
@@ -98,6 +135,20 @@ void test_step_6() {
     assert(y.parent_count() == 0);
 }
 
+void test_step_7() {
+    Value x{2.0};
+    Value y{3.0};
+    Value z = x * y + x;
+
+    z.backward();
+
+    assert(z.data() == 8.0);
+    assert(z.grad() == 1.0);
+    assert(x.grad() == 4.0);
+    assert(y.grad() == 2.0);
+}
+
 int main() {
     test_step_6();
+    test_step_7();
 }
