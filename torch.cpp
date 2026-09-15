@@ -67,7 +67,11 @@ int main() {
     assert(close(constant.tangent, 0.0));
 
     Dual x{2.0, 1.0};
-    Dual y = x + x - Dual{1.0, 0.0};
-    assert(close(y.value, 3.0));
-    assert(close(y.tangent, 2.0));
+    // Dual y = x + x - Dual{1.0, 0.0};
+    // assert(close(y.value, 3.0));
+    // assert(close(y.tangent, 2.0));
+
+    Dual y = x * x + Dual{3.0, 0.0} * x + Dual{1.0, 0.0};
+    assert(close(y.value, 11.0));
+    assert(close(y.tangent, 7.0));
 }
