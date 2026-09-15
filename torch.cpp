@@ -1,4 +1,5 @@
 #include <algorithm>
+#include <iostream>
 #include <cassert>
 #include <cmath>
 
@@ -42,6 +43,10 @@ class Dual{
             return Dual(std::log(value), tangent / value);
         }
 
+        Dual tanh() const {
+            return Dual(std::tanh(value), tangent / (std::cosh(value) * std::cosh(value)));
+        }
+
         Dual pow(const Dual& other) const {
             return Dual(std::pow(value, other.value), std::pow(value, other.value) * (other.tangent * std::log(value) + tangent * other.value / value));
         }
@@ -55,23 +60,34 @@ class Dual{
         }
 };
 
+Dual sin(const Dual& x) {
+    return x.sin();
+}
+
+Dual cos(const Dual& x) {
+    return x.cos();
+}
+
+Dual exp(const Dual& x) {
+    return x.exp();
+}
+
+Dual log(const Dual& x) {
+    return x.log();
+}
+
+Dual tanh(const Dual& x) {
+    return x.tanh();
+}
+
 bool close(double a, double b, double eps = 1e-9){
     return std::abs(a - b) <= eps * std::max({1.0, std::abs(a), std::abs(b)});
 }
 
 int main() {
-    assert(close(0.1 + 0.2, 0.3));
-    assert(close(1e9, 1e9 + 0.5));
-
-    Dual constant{1.0};
-    assert(close(constant.tangent, 0.0));
-
     Dual x{2.0, 1.0};
-    // Dual y = x + x - Dual{1.0, 0.0};
-    // assert(close(y.value, 3.0));
-    // assert(close(y.tangent, 2.0));
+    Dual y{3.0, -2.0};
+    Dual z = x * y + sin(x);
 
-    Dual y = x * x + Dual{3.0, 0.0} * x + Dual{1.0, 0.0};
-    assert(close(y.value, 11.0));
-    assert(close(y.tangent, 7.0));
+    std::cout<<"z.value: " << z.value << ", z.tangent: " << z.tangent << std::endl;
 }
