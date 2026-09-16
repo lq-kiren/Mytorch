@@ -61,4 +61,60 @@ std::ostream& operator<<(std::ostream& os, const Tensor& tensor) {
     return os;
 }
 
+Tensor Tensor::operator+(const Tensor& tensor) const {
+    if (shape_ != tensor.shape_) {
+        throw std::invalid_argument("tensor shapes do not match for addition");
+    }
+
+    std::vector<float> result_data(data_.size());
+    for (std::size_t i = 0; i < data_.size(); ++i) {
+        result_data[i] = data_[i] + tensor.data_[i];
+    }
+
+    return Tensor(std::move(result_data), shape_);
+}
+
+Tensor Tensor::operator-(const Tensor& tensor) const {
+    if (shape_ != tensor.shape_) {
+        throw std::invalid_argument("tensor shapes do not match for subtraction");
+    }
+
+    std::vector<float> result_data(data_.size());
+    for (std::size_t i = 0; i < data_.size(); ++i) {
+        result_data[i] = data_[i] - tensor.data_[i];
+    }
+
+    return Tensor(std::move(result_data), shape_);
+}
+
+Tensor Tensor::operator*(const Tensor& tensor) const {
+    if (shape_ != tensor.shape_) {
+        throw std::invalid_argument("tensor shapes do not match for multiplication");
+    }
+
+    std::vector<float> result_data(data_.size());
+    for (std::size_t i = 0; i < data_.size(); ++i) {
+        result_data[i] = data_[i] * tensor.data_[i];
+    }
+
+    return Tensor(std::move(result_data), shape_);
+
+}   
+
+Tensor Tensor::operator/(const Tensor& tensor) const {
+    if (shape_ != tensor.shape_) {
+        throw std::invalid_argument("tensor shapes do not match for division");
+    }
+
+    std::vector<float> result_data(data_.size());
+    for (std::size_t i = 0; i < data_.size(); ++i) {
+        if (tensor.data_[i] == 0) {
+            throw std::invalid_argument("division by zero in tensor division");
+        }
+        result_data[i] = data_[i] / tensor.data_[i];
+    }
+
+    return Tensor(std::move(result_data), shape_);
+}
+
 }  // namespace mytorch
