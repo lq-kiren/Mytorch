@@ -21,7 +21,9 @@
 *.pdb
 
 # Editors and operating systems
-.vscode/
+.vscode/*
+!.vscode/tasks.json
+!.vscode/launch.json
 .idea/
 *.swp
 *.swo

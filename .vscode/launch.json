@@ -1,0 +1,15 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Debug tensor_test",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}\\build\\tensor_test.exe",
+            "cwd": "${workspaceFolder}",
+            "MIMode": "gdb",
+            "miDebuggerPath": "D:\\Programme\\Tools\\mingw64\\bin\\gdb.exe",
+            "preLaunchTask": "CMake: build tensor_test"
+        }
+    ]
+}

@@ -1,5 +1,6 @@
 #pragma once
 
+#include <ostream>
 #include <cstddef>
 #include <vector>
 
@@ -13,6 +14,8 @@ public:
     const std::vector<std::size_t>& shape() const noexcept { return shape_; }
     std::size_t size() const noexcept { return data_.size(); }
     std::size_t rank() const noexcept { return shape_.size(); }
+
+    friend std::ostream& operator<<(std::ostream& output, const Tensor& tensor);
 
 private:
     // Module 01 先使用连续、行优先存储；广播和 view 后续再加入。
