@@ -15,6 +15,7 @@ public:
     std::size_t size() const noexcept { return data_.size(); }
     std::size_t rank() const noexcept { return shape_.size(); }
 
+    void info() const noexcept;
     friend std::ostream& operator<<(std::ostream& output, const Tensor& tensor);
 
 private:

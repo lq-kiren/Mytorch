@@ -1,7 +1,8 @@
 #include "mytorch/tensor.h"
 
 #include <vector>
-#include <ostream>
+#include <functional>
+#include <iostream>
 #include <stdexcept>
 #include <utility>
 
@@ -19,19 +20,45 @@ Tensor::Tensor(std::vector<float> data, std::vector<std::size_t> shape)
     }
 }
 
-std::ostream& operator<<(std::ostream& os, const Tensor& tensor) {
-    auto print = [&os](const auto& values) {
+void Tensor::info() const noexcept {
+    auto print = [](const auto& values) {
         const char* separator = "";
         for (const auto& value : values) {
-            os << separator << value;
+            std::cout << separator << value;
             separator = ", ";
         }
-    }; 
-    os<< "Tensor(shape=";
-    print(tensor.shape_);
-    os << ", data=";
-    print(tensor.data_);
-    return os << ")";
+    };
+
+    std::cout << "Tensor(shape={";
+    print(shape_);
+    std::cout << "}, data={";
+    print(data_);
+    std::cout << "})" << std::endl;
+}
+
+std::ostream& operator<<(std::ostream& os, const Tensor& tensor) {
+    
+    std::function<void(std::size_t, std::size_t&)> print_recursive;
+    print_recursive = [&](std::size_t dim, std::size_t& index) {
+        if (dim == tensor.shape_.size()) {
+            os << tensor.data_[index++];
+            return;
+        }
+
+        os << "[";
+        for (std::size_t i = 0; i < tensor.shape_[dim]; ++i) {
+            if (i > 0) {
+                os << ", ";
+            }
+            print_recursive(dim + 1, index);
+        }
+        os << "]";
+    };
+
+    std::size_t index = 0;
+    print_recursive(0, index);
+
+    return os;
 }
 
 }  // namespace mytorch
