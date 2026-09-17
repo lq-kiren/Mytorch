@@ -117,4 +117,26 @@ Tensor Tensor::operator/(const Tensor& tensor) const {
     return Tensor(std::move(result_data), shape_);
 }
 
+std::vector<std::size_t> Tensor::broadcast_shape(const Tensor tensor) const {
+    std::vector<std::size_t> result;
+
+    std::size_t i = shape_.size();
+    std::size_t j = tensor.shape_.size();
+    
+    while (i > 0 || j > 0){
+        std::size_t dim1 = (i > 0) ? shape_[i - 1] : 1;
+        std::size_t dim2 = (j > 0) ? tensor.shape_[j - 1] : 1;
+
+        if (dim1 == dim2 || dim1 == 1 || dim2 == 1) {
+            result.push_back(std::max(dim1, dim2));
+        } else {
+            throw std::invalid_argument("tensor shapes are not broadcastable");
+        }
+
+        if (i > 0) --i;
+        if (j > 0) --j;
+    }
+    std::reverse(result.begin(), result.end());
+    return result;
+}
 }  // namespace mytorch

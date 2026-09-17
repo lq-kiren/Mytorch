@@ -18,6 +18,8 @@ public:
     void info() const noexcept;
     friend std::ostream& operator<<(std::ostream& output, const Tensor& tensor);
 
+    std::vector<std::size_t> broadcast_shape(const Tensor other) const;
+
     Tensor operator+(const Tensor& tensor) const;
     Tensor operator-(const Tensor& tensor) const;
     Tensor operator*(const Tensor& tensor) const;
