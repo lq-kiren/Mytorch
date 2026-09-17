@@ -1,84 +1,84 @@
 #include "mytorch/tensor.h"
 
 #include <cassert>
+#include <sstream>
 #include <stdexcept>
 #include <vector>
-#include <iostream>
+
+namespace {
+
+class FlushTrackingBuffer : public std::stringbuf {
+public:
+    bool flushed = false;
+
+protected:
+    int sync() override {
+        flushed = true;
+        return std::stringbuf::sync();
+    }
+};
+
+void assert_tensor(const mytorch::Tensor& tensor,
+                   const std::vector<float>& expected_data,
+                   const std::vector<std::size_t>& expected_shape) {
+    assert(tensor.data() == expected_data);
+    assert(tensor.shape() == expected_shape);
+}
+
+template <typename Operation>
+void assert_invalid_argument(Operation operation) {
+    bool threw = false;
+    try {
+        operation();
+    } catch (const std::invalid_argument&) {
+        threw = true;
+    }
+    assert(threw);
+}
+
+}  // namespace
 
 int main() {
-    mytorch::Tensor matrix{{1, 2, 3, 4, 5, 6}, {2, 3}};
+    const mytorch::Tensor matrix{{1, 2, 3, 4, 5, 6}, {2, 3}};
 
-    std::cout << "Matrix: "<< matrix << std::endl;
-    std::cout << "Matrix.info(): ";
-    matrix.info();
-    std::cout << "Matrix.shape().size(): " << matrix.shape().size() << std::endl;
-    std::cout << "Matrix.size(): " << matrix.size() << std::endl;
-    std::cout << "Matrix.rank(): " << matrix.rank() << std::endl;
+    FlushTrackingBuffer info_buffer;
+    std::ostream info_output(&info_buffer);
+    matrix.info(info_output);
+    assert(info_buffer.str() == "Tensor(shape={2, 3}, data={1, 2, 3, 4, 5, 6})\n");
+    assert(info_buffer.flushed);
 
+    std::ostringstream tensor_output;
+    tensor_output << matrix;
+    assert(tensor_output.str() == "[[1, 2, 3], [4, 5, 6]]");
 
-
-    mytorch::Tensor matrix2{{6, 5, 4, 3, 2, 1}, {2, 3}};
-
-    mytorch::Tensor sum = matrix + matrix2;
-    std::cout << "Sum: " << sum << std::endl;
-    mytorch::Tensor difference = matrix - matrix2;
-    std::cout << "Difference: " << difference << std::endl;
-    mytorch::Tensor product = matrix * matrix2;
-    std::cout << "Product: " << product << std::endl;
-    mytorch::Tensor quotient = matrix / matrix2;
-    std::cout << "Quotient: " << quotient << std::endl;
+    const mytorch::Tensor matrix2{{6, 5, 4, 3, 2, 1}, {2, 3}};
+    assert_tensor(matrix + matrix2, {7, 7, 7, 7, 7, 7}, {2, 3});
 
     const mytorch::Tensor row{{1, 2, 3}, {3}};
-
-    const mytorch::Tensor broadcast_sum = matrix + row;
-    assert(broadcast_sum.shape() == std::vector<std::size_t>({2, 3}));
-    assert(broadcast_sum.data() == std::vector<float>({2, 4, 6, 5, 7, 9}));
-
-    const mytorch::Tensor broadcast_difference = matrix - row;
-    assert(broadcast_difference.data() == std::vector<float>({0, 0, 0, 3, 3, 3}));
-
-    const mytorch::Tensor reverse_difference = row - matrix;
-    assert(reverse_difference.shape() == std::vector<std::size_t>({2, 3}));
-    assert(reverse_difference.data() == std::vector<float>({0, 0, 0, -3, -3, -3}));
-
-    const mytorch::Tensor broadcast_product = matrix * row;
-    assert(broadcast_product.data() == std::vector<float>({1, 4, 9, 4, 10, 18}));
-
-    const mytorch::Tensor broadcast_quotient = matrix / row;
-    assert(broadcast_quotient.data() == std::vector<float>({1, 1, 1, 4, 2.5F, 2}));
+    assert_tensor(matrix + row, {2, 4, 6, 5, 7, 9}, {2, 3});
+    assert_tensor(matrix - row, {0, 0, 0, 3, 3, 3}, {2, 3});
+    assert_tensor(row - matrix, {0, 0, 0, -3, -3, -3}, {2, 3});
+    assert_tensor(matrix * row, {1, 4, 9, 4, 10, 18}, {2, 3});
+    assert_tensor(matrix / row, {1, 1, 1, 4, 2.5F, 2}, {2, 3});
 
     const mytorch::Tensor column{{10, 20}, {2, 1}};
-    const mytorch::Tensor outer_sum = column + row;
-    assert(outer_sum.shape() == std::vector<std::size_t>({2, 3}));
-    assert(outer_sum.data() == std::vector<float>({11, 12, 13, 21, 22, 23}));
+    assert_tensor(column + row, {11, 12, 13, 21, 22, 23}, {2, 3});
 
     const mytorch::Tensor scalar{{2}, {}};
-    const mytorch::Tensor scaled = scalar * matrix;
-    assert(scaled.shape() == std::vector<std::size_t>({2, 3}));
-    assert(scaled.data() == std::vector<float>({2, 4, 6, 8, 10, 12}));
+    assert_tensor(scalar * matrix, {2, 4, 6, 8, 10, 12}, {2, 3});
 
     const mytorch::Tensor empty{std::vector<float>{}, {0, 3}};
     const mytorch::Tensor singleton_row{{1, 2, 3}, {1, 3}};
-    const mytorch::Tensor empty_sum = empty + singleton_row;
-    assert(empty_sum.shape() == std::vector<std::size_t>({0, 3}));
-    assert(empty_sum.data().empty());
-    const mytorch::Tensor reverse_empty_sum = singleton_row + empty;
-    assert(reverse_empty_sum.shape() == std::vector<std::size_t>({0, 3}));
-    assert(reverse_empty_sum.data().empty());
+    assert_tensor(empty + singleton_row, {}, {0, 3});
+    assert_tensor(singleton_row + empty, {}, {0, 3});
 
-    bool incompatible_shapes_threw = false;
-    try {
+    assert_invalid_argument([&] {
         (void)(matrix + mytorch::Tensor{{1, 2, 3, 4}, {2, 2}});
-    } catch (const std::invalid_argument&) {
-        incompatible_shapes_threw = true;
-    }
-    assert(incompatible_shapes_threw);
-
-    bool division_by_zero_threw = false;
-    try {
+    });
+    assert_invalid_argument([&] {
         (void)(matrix / mytorch::Tensor{{1, 0, 1}, {3}});
-    } catch (const std::invalid_argument&) {
-        division_by_zero_threw = true;
-    }
-    assert(division_by_zero_threw);
+    });
+    assert_invalid_argument([] {
+        (void)mytorch::Tensor{{1, 2, 3}, {2, 2}};
+    });
 }

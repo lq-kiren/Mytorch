@@ -11,6 +11,73 @@ namespace mytorch {
 
 namespace {
 
+std::size_t element_count(const std::vector<std::size_t>& shape) {
+    std::size_t count = 1;
+    for (std::size_t dimension : shape) {
+        count *= dimension;
+    }
+    return count;
+}
+
+template <typename Values>
+void print_values(std::ostream& os, const Values& values) {
+    const char* separator = "";
+    for (const auto& value : values) {
+        os << separator << value;
+        separator = ", ";
+    }
+}
+
+void print_tensor(std::ostream& os,
+                  const std::vector<float>& data,
+                  const std::vector<std::size_t>& shape,
+                  std::size_t dimension,
+                  std::size_t& index) {
+    // 到达最内层维度时，输出当前扁平存储中的元素。
+    if (dimension == shape.size()) {
+        os << data[index++];
+        return;
+    }
+
+    os << '[';
+    for (std::size_t i = 0; i < shape[dimension]; ++i) {
+        if (i > 0) {
+            os << ", ";
+        }
+        print_tensor(os, data, shape, dimension + 1, index);
+    }
+    os << ']';
+}
+
+std::vector<std::size_t> broadcast_shape(const std::vector<std::size_t>& lhs,
+                                         const std::vector<std::size_t>& rhs) {
+    std::vector<std::size_t> result;
+    std::size_t i = lhs.size();
+    std::size_t j = rhs.size();
+
+    // 从末维向前比较；缺失的前导维按长度 1 处理。
+    while (i > 0 || j > 0) {
+        const std::size_t lhs_dimension = i > 0 ? lhs[i - 1] : 1;
+        const std::size_t rhs_dimension = j > 0 ? rhs[j - 1] : 1;
+
+        if (lhs_dimension == rhs_dimension) {
+            result.push_back(lhs_dimension);
+        } else if (lhs_dimension == 1) {
+            result.push_back(rhs_dimension);
+        } else if (rhs_dimension == 1) {
+            result.push_back(lhs_dimension);
+        } else {
+            throw std::invalid_argument("tensor shapes are not broadcastable");
+        }
+
+        if (i > 0) --i;
+        if (j > 0) --j;
+    }
+
+    std::reverse(result.begin(), result.end());
+    return result;
+}
+
 std::vector<std::size_t> contiguous_strides(const std::vector<std::size_t>& shape) {
     // 行优先连续布局，例如 shape={2,3,4} 对应 strides={12,4,1}。
     std::vector<std::size_t> strides(shape.size(), 1);
@@ -23,15 +90,11 @@ std::vector<std::size_t> contiguous_strides(const std::vector<std::size_t>& shap
 template <typename Operation>
 Tensor elementwise(const Tensor& lhs, const Tensor& rhs, Operation operation) {
     // 只生成结果数据，不实际复制或展开参与广播的输入。
-    std::vector<std::size_t> result_shape = lhs.broadcast_shape(rhs);
+    std::vector<std::size_t> result_shape = broadcast_shape(lhs.shape(), rhs.shape());
     const std::vector<std::size_t> lhs_strides = contiguous_strides(lhs.shape());
     const std::vector<std::size_t> rhs_strides = contiguous_strides(rhs.shape());
 
-    std::size_t result_size = 1;
-    for (std::size_t dimension : result_shape) {
-        result_size *= dimension;
-    }
-
+    const std::size_t result_size = element_count(result_shape);
     std::vector<float> result_data(result_size);
     // rank 较小的输入在左侧补 1，使两个 shape 从末维对齐。
     const std::size_t lhs_leading_dimensions = result_shape.size() - lhs.rank();
@@ -73,55 +136,26 @@ Tensor elementwise(const Tensor& lhs, const Tensor& rhs, Operation operation) {
 
 Tensor::Tensor(std::vector<float> data, std::vector<std::size_t> shape)
     : data_(std::move(data)), shape_(std::move(shape)) {
-    std::size_t expected_size = 1;
-    for (std::size_t dimension : shape_) {
-        expected_size *= dimension;
-    }
-
-    if (expected_size != data_.size()) {
+    if (element_count(shape_) != data_.size()) {
         throw std::invalid_argument("tensor data size does not match shape");
     }
 }
 
-void Tensor::info() const noexcept {
-    auto print = [](const auto& values) {
-        const char* separator = "";
-        for (const auto& value : values) {
-            std::cout << separator << value;
-            separator = ", ";
-        }
-    };
+void Tensor::info() const {
+    info(std::cout);
+}
 
-    std::cout << "Tensor(shape={";
-    print(shape_);
-    std::cout << "}, data={";
-    print(data_);
-    std::cout << "})" << std::endl;
+void Tensor::info(std::ostream& os) const {
+    os << "Tensor(shape={";
+    print_values(os, shape_);
+    os << "}, data={";
+    print_values(os, data_);
+    os << "})" << std::endl;
 }
 
 std::ostream& operator<<(std::ostream& os, const Tensor& tensor) {
-    
-    std::function<void(std::size_t, std::size_t&)> print_recursive;
-    print_recursive = [&](std::size_t dim, std::size_t& index) {
-        // 到达最内层维度时，输出当前扁平存储中的元素。
-        if (dim == tensor.shape_.size()) {
-            os << tensor.data_[index++];
-            return;
-        }
-
-        os << "[";
-        for (std::size_t i = 0; i < tensor.shape_[dim]; ++i) {
-            if (i > 0) {
-                os << ", ";
-            }
-            print_recursive(dim + 1, index);
-        }
-        os << "]";
-    };
-
     std::size_t index = 0;
-    print_recursive(0, index);
-
+    print_tensor(os, tensor.data(), tensor.shape(), 0, index);
     return os;
 }
 
@@ -146,31 +180,4 @@ Tensor Tensor::operator/(const Tensor& tensor) const {
     });
 }
 
-std::vector<std::size_t> Tensor::broadcast_shape(const Tensor& tensor) const {
-    std::vector<std::size_t> result;
-
-    std::size_t i = shape_.size();
-    std::size_t j = tensor.shape_.size();
-    
-    // 从末维向前比较；缺失的前导维按长度 1 处理。
-    while (i > 0 || j > 0){
-        std::size_t dim1 = (i > 0) ? shape_[i - 1] : 1;
-        std::size_t dim2 = (j > 0) ? tensor.shape_[j - 1] : 1;
-
-        if (dim1 == dim2) {
-            result.push_back(dim1);
-        } else if (dim1 == 1) {
-            result.push_back(dim2);
-        } else if (dim2 == 1) {
-            result.push_back(dim1);
-        } else {
-            throw std::invalid_argument("tensor shapes are not broadcastable");
-        }
-
-        if (i > 0) --i;
-        if (j > 0) --j;
-    }
-    std::reverse(result.begin(), result.end());
-    return result;
-}
 }  // namespace mytorch

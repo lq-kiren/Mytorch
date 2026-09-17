@@ -1,7 +1,7 @@
 #pragma once
 
-#include <ostream>
 #include <cstddef>
+#include <iosfwd>
 #include <vector>
 
 namespace mytorch {
@@ -15,10 +15,8 @@ public:
     std::size_t size() const noexcept { return data_.size(); }
     std::size_t rank() const noexcept { return shape_.size(); }
 
-    void info() const noexcept;
-    friend std::ostream& operator<<(std::ostream& output, const Tensor& tensor);
-
-    std::vector<std::size_t> broadcast_shape(const Tensor& other) const;
+    void info() const;
+    void info(std::ostream& output) const;
 
     Tensor operator+(const Tensor& tensor) const;
     Tensor operator-(const Tensor& tensor) const;
@@ -30,5 +28,7 @@ private:
     std::vector<float> data_;
     std::vector<std::size_t> shape_;
 };
+
+std::ostream& operator<<(std::ostream& output, const Tensor& tensor);
 
 }  // namespace mytorch
