@@ -127,6 +127,11 @@ int main() {
     const mytorch::Tensor zero_columns{std::vector<float>{}, {3, 0}};
     assert_tensor(matrix_lhs.matmul(zero_columns), {}, {2, 0});
 
+    const std::size_t huge = std::numeric_limits<std::size_t>::max() / 2 + 1;
+    const mytorch::Tensor huge_empty_batch{std::vector<float>{}, {huge, 2, 0, 1}};
+    const mytorch::Tensor one_by_one{{1}, {1, 1}};
+    assert_tensor(huge_empty_batch.matmul(one_by_one), {}, {huge, 2, 0, 1});
+
     assert_invalid_argument([&] {
         (void)mytorch::Tensor{{1}, {}}.matmul(dot_rhs);
     });

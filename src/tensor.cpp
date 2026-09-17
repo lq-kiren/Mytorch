@@ -243,6 +243,16 @@ Tensor Tensor::matmul(const Tensor& tensor) const {
     result_shape.push_back(columns);
 
     std::vector<float> result_data(element_count(result_shape), 0.0F);
+    if (lhs_was_vector) {
+        result_shape.erase(result_shape.begin() + batch_shape.size());
+    }
+    if (rhs_was_vector) {
+        result_shape.pop_back();
+    }
+    if (result_data.empty()) {
+        return Tensor(std::move(result_data), std::move(result_shape));
+    }
+
     const std::vector<std::size_t> lhs_strides = contiguous_strides(lhs_shape);
     const std::vector<std::size_t> rhs_strides = contiguous_strides(rhs_shape);
     const std::size_t batch_count = element_count(batch_shape);
@@ -269,13 +279,6 @@ Tensor Tensor::matmul(const Tensor& tensor) const {
                 result_data[result_batch_offset + row * columns + column] = sum;
             }
         }
-    }
-
-    if (lhs_was_vector) {
-        result_shape.erase(result_shape.begin() + batch_shape.size());
-    }
-    if (rhs_was_vector) {
-        result_shape.pop_back();
     }
 
     return Tensor(std::move(result_data), std::move(result_shape));
