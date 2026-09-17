@@ -18,7 +18,7 @@ public:
     void info() const noexcept;
     friend std::ostream& operator<<(std::ostream& output, const Tensor& tensor);
 
-    std::vector<std::size_t> broadcast_shape(const Tensor other) const;
+    std::vector<std::size_t> broadcast_shape(const Tensor& other) const;
 
     Tensor operator+(const Tensor& tensor) const;
     Tensor operator-(const Tensor& tensor) const;
@@ -26,7 +26,7 @@ public:
     Tensor operator/(const Tensor& tensor) const;
 
 private:
-    // Module 01 先使用连续、行优先存储；广播和 view 后续再加入。
+    // Contiguous row-major storage; views are not supported yet.
     std::vector<float> data_;
     std::vector<std::size_t> shape_;
 };
