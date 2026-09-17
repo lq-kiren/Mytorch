@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <functional>
 #include <iostream>
+#include <limits>
 #include <stdexcept>
 #include <utility>
 #include <vector>
@@ -12,8 +13,15 @@ namespace mytorch {
 namespace {
 
 std::size_t element_count(const std::vector<std::size_t>& shape) {
+    if (std::find(shape.begin(), shape.end(), 0) != shape.end()) {
+        return 0;
+    }
+
     std::size_t count = 1;
     for (std::size_t dimension : shape) {
+        if (count > std::numeric_limits<std::size_t>::max() / dimension) {
+            throw std::invalid_argument("tensor shape element count overflows");
+        }
         count *= dimension;
     }
     return count;

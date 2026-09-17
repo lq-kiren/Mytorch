@@ -1,6 +1,7 @@
 #include "mytorch/tensor.h"
 
 #include <cassert>
+#include <limits>
 #include <sstream>
 #include <stdexcept>
 #include <vector>
@@ -81,6 +82,10 @@ int main() {
     assert_invalid_argument([] {
         (void)mytorch::Tensor{{1, 2, 3}, {2, 2}};
     });
+    assert_invalid_argument([] {
+        const std::size_t huge = std::numeric_limits<std::size_t>::max() / 2 + 1;
+        (void)mytorch::Tensor{std::vector<float>{}, {huge, 2, 1}};
+    });
 
     const mytorch::Tensor dot_lhs{{1, 2, 3}, {3}};
     const mytorch::Tensor dot_rhs{{4, 5, 6}, {3}};
@@ -101,9 +106,10 @@ int main() {
         {1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12}, {2, 2, 3}};
     const mytorch::Tensor unbatched_rhs{{1, 0, 1}, {3, 1}};
     assert_tensor(batched_lhs.matmul(unbatched_rhs), {4, 10, 16, 22}, {2, 2, 1});
+    assert_tensor(batched_lhs.matmul(vector_rhs), {14, 32, 50, 68}, {2, 2});
 
     const mytorch::Tensor singleton_batch_lhs{{1, 2, 3, 4, 5, 6, 7, 8}, {2, 1, 2, 2}};
-    const mytorch::Tensor singleton_batch_rhs{{1, 0, 0, 1, 1, 1}, {1, 3, 2, 1}};
+    const mytorch::Tensor singleton_batch_rhs{{1, 0, 0, 1, 1, 1}, {3, 2, 1}};
     assert_tensor(singleton_batch_lhs.matmul(singleton_batch_rhs),
                   {1, 3, 2, 4, 3, 7, 5, 7, 6, 8, 11, 15},
                   {2, 3, 2, 1});
@@ -111,6 +117,15 @@ int main() {
     const mytorch::Tensor empty_matrix{std::vector<float>{}, {2, 0}};
     const mytorch::Tensor empty_rhs{std::vector<float>{}, {0, 3}};
     assert_tensor(empty_matrix.matmul(empty_rhs), {0, 0, 0, 0, 0, 0}, {2, 3});
+
+    const mytorch::Tensor zero_batch{std::vector<float>{}, {0, 2, 3}};
+    assert_tensor(zero_batch.matmul(matrix_product_rhs), {}, {0, 2, 2});
+
+    const mytorch::Tensor zero_rows{std::vector<float>{}, {0, 3}};
+    assert_tensor(zero_rows.matmul(matrix_product_rhs), {}, {0, 2});
+
+    const mytorch::Tensor zero_columns{std::vector<float>{}, {3, 0}};
+    assert_tensor(matrix_lhs.matmul(zero_columns), {}, {2, 0});
 
     assert_invalid_argument([&] {
         (void)mytorch::Tensor{{1}, {}}.matmul(dot_rhs);
