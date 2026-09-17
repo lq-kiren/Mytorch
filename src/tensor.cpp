@@ -87,6 +87,30 @@ std::vector<std::size_t> contiguous_strides(const std::vector<std::size_t>& shap
     return strides;
 }
 
+std::size_t broadcast_batch_offset(
+    std::size_t batch_index,
+    const std::vector<std::size_t>& batch_shape,
+    const std::vector<std::size_t>& operand_shape,
+    const std::vector<std::size_t>& operand_strides) {
+    std::size_t offset = 0;
+    const std::size_t operand_batch_rank = operand_shape.size() - 2;
+    const std::size_t leading_dimensions = batch_shape.size() - operand_batch_rank;
+
+    for (std::size_t dimension = batch_shape.size(); dimension-- > 0;) {
+        const std::size_t coordinate = batch_index % batch_shape[dimension];
+        batch_index /= batch_shape[dimension];
+
+        if (dimension >= leading_dimensions) {
+            const std::size_t operand_dimension = dimension - leading_dimensions;
+            if (operand_shape[operand_dimension] != 1) {
+                offset += coordinate * operand_strides[operand_dimension];
+            }
+        }
+    }
+
+    return offset;
+}
+
 template <typename Operation>
 Tensor elementwise(const Tensor& lhs, const Tensor& rhs, Operation operation) {
     // 只生成结果数据，不实际复制或展开参与广播的输入。
@@ -178,6 +202,75 @@ Tensor Tensor::operator/(const Tensor& tensor) const {
         }
         return lhs / rhs;
     });
+}
+
+Tensor Tensor::matmul(const Tensor& tensor) const {
+    if (rank() == 0 || tensor.rank() == 0) {
+        throw std::invalid_argument("matmul requires tensors with rank at least 1");
+    }
+
+    const bool lhs_was_vector = rank() == 1;
+    const bool rhs_was_vector = tensor.rank() == 1;
+
+    std::vector<std::size_t> lhs_shape = shape_;
+    std::vector<std::size_t> rhs_shape = tensor.shape_;
+    if (lhs_was_vector) lhs_shape.insert(lhs_shape.begin(), 1);
+    if (rhs_was_vector) rhs_shape.push_back(1);
+
+    const std::size_t rows = lhs_shape[lhs_shape.size() - 2];
+    const std::size_t inner = lhs_shape.back();
+    const std::size_t rhs_inner = rhs_shape[rhs_shape.size() - 2];
+    const std::size_t columns = rhs_shape.back();
+    if (inner != rhs_inner) {
+        throw std::invalid_argument("matmul inner dimensions do not match");
+    }
+
+    const std::vector<std::size_t> lhs_batch_shape(lhs_shape.begin(), lhs_shape.end() - 2);
+    const std::vector<std::size_t> rhs_batch_shape(rhs_shape.begin(), rhs_shape.end() - 2);
+    const std::vector<std::size_t> batch_shape =
+        broadcast_shape(lhs_batch_shape, rhs_batch_shape);
+
+    std::vector<std::size_t> result_shape = batch_shape;
+    result_shape.push_back(rows);
+    result_shape.push_back(columns);
+
+    std::vector<float> result_data(element_count(result_shape), 0.0F);
+    const std::vector<std::size_t> lhs_strides = contiguous_strides(lhs_shape);
+    const std::vector<std::size_t> rhs_strides = contiguous_strides(rhs_shape);
+    const std::size_t batch_count = element_count(batch_shape);
+
+    for (std::size_t batch = 0; batch < batch_count; ++batch) {
+        const std::size_t lhs_batch_offset =
+            broadcast_batch_offset(batch, batch_shape, lhs_shape, lhs_strides);
+        const std::size_t rhs_batch_offset =
+            broadcast_batch_offset(batch, batch_shape, rhs_shape, rhs_strides);
+        const std::size_t result_batch_offset = batch * rows * columns;
+
+        for (std::size_t row = 0; row < rows; ++row) {
+            for (std::size_t column = 0; column < columns; ++column) {
+                float sum = 0.0F;
+                for (std::size_t k = 0; k < inner; ++k) {
+                    const std::size_t lhs_index =
+                        lhs_batch_offset + row * lhs_strides[lhs_shape.size() - 2]
+                        + k * lhs_strides.back();
+                    const std::size_t rhs_index =
+                        rhs_batch_offset + k * rhs_strides[rhs_shape.size() - 2]
+                        + column * rhs_strides.back();
+                    sum += data_[lhs_index] * tensor.data_[rhs_index];
+                }
+                result_data[result_batch_offset + row * columns + column] = sum;
+            }
+        }
+    }
+
+    if (lhs_was_vector) {
+        result_shape.erase(result_shape.begin() + batch_shape.size());
+    }
+    if (rhs_was_vector) {
+        result_shape.pop_back();
+    }
+
+    return Tensor(std::move(result_data), std::move(result_shape));
 }
 
 }  // namespace mytorch

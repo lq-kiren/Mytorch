@@ -81,4 +81,46 @@ int main() {
     assert_invalid_argument([] {
         (void)mytorch::Tensor{{1, 2, 3}, {2, 2}};
     });
+
+    const mytorch::Tensor dot_lhs{{1, 2, 3}, {3}};
+    const mytorch::Tensor dot_rhs{{4, 5, 6}, {3}};
+    assert_tensor(dot_lhs.matmul(dot_rhs), {32}, {});
+
+    const mytorch::Tensor vector_lhs{{1, 2}, {2}};
+    const mytorch::Tensor matrix_rhs{{1, 2, 3, 4, 5, 6}, {2, 3}};
+    assert_tensor(vector_lhs.matmul(matrix_rhs), {9, 12, 15}, {3});
+
+    const mytorch::Tensor matrix_lhs{{1, 2, 3, 4, 5, 6}, {2, 3}};
+    const mytorch::Tensor vector_rhs{{1, 2, 3}, {3}};
+    assert_tensor(matrix_lhs.matmul(vector_rhs), {14, 32}, {2});
+
+    const mytorch::Tensor matrix_product_rhs{{7, 8, 9, 10, 11, 12}, {3, 2}};
+    assert_tensor(matrix_lhs.matmul(matrix_product_rhs), {58, 64, 139, 154}, {2, 2});
+
+    const mytorch::Tensor batched_lhs{
+        {1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12}, {2, 2, 3}};
+    const mytorch::Tensor unbatched_rhs{{1, 0, 1}, {3, 1}};
+    assert_tensor(batched_lhs.matmul(unbatched_rhs), {4, 10, 16, 22}, {2, 2, 1});
+
+    const mytorch::Tensor singleton_batch_lhs{{1, 2, 3, 4, 5, 6, 7, 8}, {2, 1, 2, 2}};
+    const mytorch::Tensor singleton_batch_rhs{{1, 0, 0, 1, 1, 1}, {1, 3, 2, 1}};
+    assert_tensor(singleton_batch_lhs.matmul(singleton_batch_rhs),
+                  {1, 3, 2, 4, 3, 7, 5, 7, 6, 8, 11, 15},
+                  {2, 3, 2, 1});
+
+    const mytorch::Tensor empty_matrix{std::vector<float>{}, {2, 0}};
+    const mytorch::Tensor empty_rhs{std::vector<float>{}, {0, 3}};
+    assert_tensor(empty_matrix.matmul(empty_rhs), {0, 0, 0, 0, 0, 0}, {2, 3});
+
+    assert_invalid_argument([&] {
+        (void)mytorch::Tensor{{1}, {}}.matmul(dot_rhs);
+    });
+    assert_invalid_argument([&] {
+        (void)mytorch::Tensor{{1, 2, 3, 4}, {2, 2}}.matmul(
+            mytorch::Tensor{{1, 2, 3}, {3, 1}});
+    });
+    assert_invalid_argument([&] {
+        (void)mytorch::Tensor{{1, 2, 3, 4, 5, 6, 7, 8}, {2, 2, 2}}.matmul(
+            mytorch::Tensor{{1, 2, 3, 4, 5, 6}, {3, 2, 1}});
+    });
 }

@@ -23,6 +23,8 @@ public:
     Tensor operator*(const Tensor& tensor) const;
     Tensor operator/(const Tensor& tensor) const;
 
+    Tensor matmul(const Tensor& tensor) const;
+
 private:
     // Contiguous row-major storage; views are not supported yet.
     std::vector<float> data_;
